@@ -12,6 +12,8 @@ import string
 import base64
 from captcha.image import ImageCaptcha
 import time
+from backend.database import SessionLocal
+from backend import models
 
 from .. import database, schemas, models, auth, crud
 

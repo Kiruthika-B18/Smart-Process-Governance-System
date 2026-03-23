@@ -7,6 +7,8 @@ from routers import auth, requests, admin
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 from datetime import datetime
+from backend import models, database
+from backend.routers import auth, requests, admin
 
 models.Base.metadata.create_all(bind=database.engine)
 
