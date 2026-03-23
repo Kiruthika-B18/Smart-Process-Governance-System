@@ -18,7 +18,7 @@ def create_admin():
     user = models.User(
         username="admin", 
         hashed_password=auth.get_password_hash("admin123"), 
-        role=models.UserRole.ADMIN.value
+        role=models.UserRole.DIRECTOR.value
     )
     db.add(user)
     db.commit()

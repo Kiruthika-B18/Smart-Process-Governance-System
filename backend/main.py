@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from . import models, database
 from .routers import auth, requests, admin
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -23,36 +24,96 @@ app.include_router(auth.router)
 app.include_router(requests.router)
 app.include_router(admin.router)
 
+import os
+os.makedirs("backend/uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="backend/uploads"), name="uploads")
+
+from fastapi.responses import JSONResponse
+from fastapi.requests import Request
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"Global Exception: {exc}")
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error. Please contact support."},
+    )
+
 # SLA Monitoring
 def check_sla_violations():
     db = database.SessionLocal()
     try:
         now = datetime.utcnow()
+        # Find all pending requests that have missed their SLA
         expired_requests = db.query(models.Request).filter(
-            models.Request.status == models.RequestStatus.PENDING,
+            models.Request.status.in_([
+                models.RequestStatus.PENDING_VILLAGE, 
+                models.RequestStatus.PENDING_BLOCK
+            ]),
             models.Request.sla_deadline < now
         ).all()
         
+        import random
         for req in expired_requests:
-            req.status = models.RequestStatus.ESCALATED
-            # Find backup manager
-            backup = db.query(models.User).filter(models.User.role == models.UserRole.BACKUP_MANAGER).first()
-            if backup:
-                req.current_handler_id = backup.id
-                req.updated_at = now
-                
-                # Audit log
-                audit = models.AuditLog(
-                    request_id=req.id,
-                    action="ESCALATED",
-                    actor_id=None, # System
-                    details="SLA deadline exceeded"
-                )
-                db.add(audit)
+            
+            # Tier 1 Miss: Village -> Escalate to Block
+            if req.status == models.RequestStatus.PENDING_VILLAGE:
+                req.status = models.RequestStatus.PENDING_BLOCK
+                blocks = db.query(models.User).filter(models.User.role == models.UserRole.BLOCK_OFFICER).all()
+                if blocks:
+                    chosen = random.choice(blocks)
+                    req.current_handler_id = chosen.id
+                    req.updated_at = now
+                    # Add 10 minutes for the new tier
+                    req.sla_deadline = now + timedelta(minutes=10)
+                    
+                    audit = models.AuditLog(
+                        request_id=req.id,
+                        action="ESCALATED_TO_BLOCK",
+                        actor_id=None, # System
+                        details=f"Village SLA exceeded. Auto-escalated to Block Officer {chosen.username}"
+                    )
+                    db.add(audit)
+                    
+            # Tier 2 Miss: Block -> Escalate to District
+            elif req.status == models.RequestStatus.PENDING_BLOCK:
+                req.status = models.RequestStatus.PENDING_DISTRICT
+                districts = db.query(models.User).filter(models.User.role == models.UserRole.DISTRICT_OFFICER).all()
+                if districts:
+                    chosen = random.choice(districts)
+                    req.current_handler_id = chosen.id
+                    req.updated_at = now
+                    # District is final, no further SLA escalation
+                    req.sla_deadline = None 
+                    
+                    audit = models.AuditLog(
+                        request_id=req.id,
+                        action="ESCALATED_TO_DISTRICT",
+                        actor_id=None, # System
+                        details=f"Block SLA exceeded. Auto-escalated to District Officer {chosen.username}"
+                    )
+                    db.add(audit)
+                else:
+                    # Fallback if no district officer
+                    directors = db.query(models.User).filter(models.User.role == models.UserRole.DIRECTOR).all()
+                    if directors:
+                        chosen = random.choice(directors)
+                        req.current_handler_id = chosen.id
+                        req.updated_at = now
+                        req.sla_deadline = None
+                        audit = models.AuditLog(
+                            request_id=req.id,
+                            action="ESCALATED_TO_DIRECTOR",
+                            actor_id=None,
+                            details="Block SLA exceeded. No District Officer found, auto-escalated to Director."
+                        )
+                        db.add(audit)
         
         if expired_requests:
             db.commit()
-            print(f"Escalated {len(expired_requests)} requests.")
+            print(f"Escalated {len(expired_requests)} delayed agricultural requests.")
             
     except Exception as e:
         print(f"Error in SLA monitor: {e}")

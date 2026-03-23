@@ -1,19 +1,9 @@
 import { X, Clock, User, FileText, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
-import { format, formatDistanceToNow, isValid } from 'date-fns';
+
 import StatusBadge from './StatusBadge';
 import UrgencyBadge from './UrgencyBadge';
 
-const formatDateSafe = (dateString, formatStr) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return isValid(date) ? format(date, formatStr) : 'Invalid Date';
-};
-
-const formatDistanceSafe = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return isValid(date) ? formatDistanceToNow(date, { addSuffix: true }) : '';
-};
+import { formatDateSafe, formatDistanceSafe } from '../utils/dateUtils';
 
 const RequestDetailsModal = ({ isOpen, onClose, request }) => {
     if (!isOpen || !request) return null;
@@ -51,7 +41,7 @@ const RequestDetailsModal = ({ isOpen, onClose, request }) => {
                 }}>
                     <div>
                         <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)' }}>Request Details</h3>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '4px' }}>#{request.id}</div>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{request.id}</div>
                     </div>
                     <button onClick={onClose} className="btn-icon" style={{
                         color: 'var(--text-secondary)',
@@ -106,7 +96,7 @@ const RequestDetailsModal = ({ isOpen, onClose, request }) => {
                                 <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 600 }}>
                                     <User size={14} />
                                 </div>
-                                {request.submitter_username || `User #${request.submitter_id}`}
+                                {request.submitter_username || `User ${request.submitter_id}`}
                             </div>
                         </div>
 
@@ -121,6 +111,34 @@ const RequestDetailsModal = ({ isOpen, onClose, request }) => {
                                         {request.handler_username}
                                     </span>
                                 ) : 'Unassigned'}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Survey Number</div>
+                            <div style={{ color: 'var(--text-primary)' }}>
+                                {request.survey_number || 'N/A'}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Land Ownership</div>
+                            <div style={{ color: 'var(--text-primary)' }}>
+                                {request.ownership_type || 'N/A'}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Location (Village / Taluk)</div>
+                            <div style={{ color: 'var(--text-primary)' }}>
+                                {request.village ? `${request.village}, ${request.taluk}` : 'N/A'}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>District</div>
+                            <div style={{ color: 'var(--text-primary)' }}>
+                                {request.district || 'N/A'}
                             </div>
                         </div>
 
@@ -156,6 +174,17 @@ const RequestDetailsModal = ({ isOpen, onClose, request }) => {
                                 </div>
                             </div>
                         )}
+
+                        {request.status === 'Approved' && request.expected_delivery_date && (
+                            <div style={{ backgroundColor: '#dbeafe', padding: '8px 12px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+                                    Expected Delivery
+                                </div>
+                                <div style={{ color: '#1e3a8a', fontSize: '0.875rem', fontWeight: 'bold' }}>
+                                    {formatDateSafe(request.expected_delivery_date, 'MMM d, yyyy')}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Rejection Reason */}
@@ -166,6 +195,37 @@ const RequestDetailsModal = ({ isOpen, onClose, request }) => {
                             </div>
                             <div style={{ color: '#7f1d1d', fontSize: '0.875rem' }}>
                                 {request.rejection_reason}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Approval History Trail */}
+                    {request.audit_logs && request.audit_logs.length > 0 && (
+                        <div style={{ marginTop: '24px' }}>
+                            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Clock size={16} /> History & Routing
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {request.audit_logs.map((log, index) => (
+                                    <div key={log.id} style={{
+                                        display: 'flex', gap: '12px', padding: '12px',
+                                        backgroundColor: '#f9fafb', borderRadius: '8px',
+                                        border: '1px solid var(--border-color)',
+                                        borderLeft: '4px solid ' + (log.action.includes('REJECT') ? 'var(--danger-color)' : log.action.includes('ESCALATE') ? 'var(--warning-color)' : 'var(--success-color)')
+                                    }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                                                {log.action.replace(/_/g, ' ')}
+                                            </div>
+                                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                                {log.details || 'No details provided.'}
+                                            </div>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                            {formatDateSafe(log.timestamp, 'MMM d, h:mm a')}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}

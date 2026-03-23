@@ -10,10 +10,13 @@ const PrivateRoute = ({ children, roles }) => {
     if (!user) return <Navigate to="/login" />;
 
     if (roles && !roles.includes(user.role)) {
+        console.log(`PrivateRoute Redirect: User role '${user.role}' not in allowed roles:`, roles);
         // Redirect to appropriate dashboard based on role
-        if (user.role === 'Employee') return <Navigate to="/dashboard" />;
-        if (user.role === 'Manager' || user.role === 'BackupManager') return <Navigate to="/manager-dashboard" />;
-        if (user.role === 'Administrator') return <Navigate to="/admin-dashboard" />;
+        if (user.role === 'Farmer') return <Navigate to="/dashboard" />;
+        if (user.role === 'VillageOfficer') return <Navigate to="/village-dashboard" />;
+        if (user.role === 'BlockOfficer') return <Navigate to="/block-dashboard" />;
+        if (user.role === 'DistrictOfficer') return <Navigate to="/district-dashboard" />;
+        if (user.role === 'Director') return <Navigate to="/admin-dashboard" />;
         return <Navigate to="/" />; // Default fallback
     }
 

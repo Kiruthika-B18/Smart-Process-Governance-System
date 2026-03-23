@@ -2,17 +2,13 @@ import { useState, useEffect, useContext } from 'react';
 import AuthContext from '../context/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { Settings, UserPlus, Save, List, Eye } from 'lucide-react';
+import { Settings, UserPlus, Save, List, Eye, Key, Users, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import { format, isValid } from 'date-fns';
 import RejectionModal from '../components/RejectionModal';
 import RequestDetailsModal from '../components/RequestDetailsModal';
 
-const formatDateSafe = (dateString, formatStr) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return isValid(date) ? format(date, formatStr) : 'Invalid Date';
-};
+import { formatDateSafe, formatDistanceSafe } from '../utils/dateUtils';
 
 const AdminDashboard = () => {
     const [sla, setSla] = useState(1440);
@@ -22,6 +18,12 @@ const AdminDashboard = () => {
     const [managerId, setManagerId] = useState('');
     const [managers, setManagers] = useState([]);
     const [requests, setRequests] = useState([]);
+    const [users, setUsers] = useState([]);
+
+    // Pagination State
+    const [reqPage, setReqPage] = useState(0);
+    const [userPage, setUserPage] = useState(0);
+    const LIMIT = 10;
 
     // Request handling state
     const [selectedRequest, setSelectedRequest] = useState(null);
@@ -34,25 +36,38 @@ const AdminDashboard = () => {
             const res = await api.get('/auth/managers');
             setManagers(res.data);
         } catch (err) {
-            toast.error("Failed to load managers help");
+            toast.error("Failed to load managers lists");
         }
     };
 
     const fetchRequests = async () => {
         try {
-            const res = await api.get('/requests');
+            const res = await api.get(`/requests?skip=${reqPage * LIMIT}&limit=${LIMIT}`);
             setRequests(res.data);
         } catch (err) {
             toast.error("Failed to load requests");
         }
     };
 
+    const fetchUsers = async () => {
+        try {
+            const res = await api.get(`/admin/users?skip=${userPage * LIMIT}&limit=${LIMIT}`);
+            setUsers(res.data);
+        } catch (err) {
+            toast.error("Failed to load users");
+        }
+    };
+
     useEffect(() => {
         fetchManagers();
+        fetchUsers();
+    }, [userPage]);
+
+    useEffect(() => {
         fetchRequests();
         const interval = setInterval(fetchRequests, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [reqPage]);
 
     const handleApprove = async (id) => {
         try {
@@ -107,17 +122,36 @@ const AdminDashboard = () => {
             setUsername('');
             setPassword('');
             setManagerId('');
+            fetchUsers(); // Refresh user list
         } catch (err) {
             toast.error(err.response?.data?.detail || 'Failed to create user');
         }
     };
 
+    const handleResetPassword = async (userId, username) => {
+        const newPassword = prompt(`Enter new password for ${username}:`);
+        if (!newPassword) return;
+        if (newPassword.length < 8) {
+            return toast.error("Password must be at least 8 characters");
+        }
+
+        try {
+            await api.put(`/admin/users/${userId}/reset-password`, { password: newPassword });
+            toast.success(`Password reset for ${username}`);
+        } catch (err) {
+            toast.error("Failed to reset password");
+        }
+    };
+
     return (
-        <div className="animation-fade-in" style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div className="animation-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '40px' }}>
             <div className="dashboard-header">
                 <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Settings style={{ color: 'var(--text-secondary)' }} /> Admin Dashboard
                 </h1>
+                <a href="/audit-logs" className="btn" style={{ marginLeft: 'auto', border: '1px solid var(--border-color)', textDecoration: 'none' }}>
+                    <ClipboardList size={18} style={{ marginRight: '6px' }} /> View Audit Logs
+                </a>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
@@ -191,12 +225,91 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
+            {/* User Management List */}
+            <div className="table-container" style={{ marginTop: '24px' }}>
+                <div className="table-header" style={{ justifyContent: 'space-between' }}>
+                    <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Users size={20} /> User Management
+                    </h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button
+                            className="btn"
+                            disabled={userPage === 0}
+                            onClick={() => setUserPage(p => p - 1)}
+                            style={{ padding: '4px 8px' }}
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Page {userPage + 1}</span>
+                        <button
+                            className="btn"
+                            disabled={!users || users.length < LIMIT}
+                            onClick={() => setUserPage(p => p + 1)}
+                            style={{ padding: '4px 8px' }}
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Manager ID</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {users.map(u => (
+                                <tr key={u.id}>
+                                    <td>{u.id}</td>
+                                    <td>{u.username}</td>
+                                    <td><span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', backgroundColor: '#e0f2fe', color: '#0369a1' }}>{u.role}</span></td>
+                                    <td>{u.manager_id || '-'}</td>
+                                    <td>
+                                        <button
+                                            onClick={() => handleResetPassword(u.id, u.username)}
+                                            className="btn"
+                                            style={{ color: 'var(--status-pending-text)', border: '1px solid var(--status-pending-bg)', fontSize: '0.75rem', padding: '4px 8px' }}
+                                        >
+                                            <Key size={14} style={{ marginRight: '4px' }} /> Reset Password
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {/* Requests List */}
             <div className="table-container" style={{ marginTop: '24px' }}>
-                <div className="table-header">
+                <div className="table-header" style={{ justifyContent: 'space-between' }}>
                     <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <List size={20} /> All Requests
                     </h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button
+                            className="btn"
+                            disabled={reqPage === 0}
+                            onClick={() => setReqPage(p => p - 1)}
+                            style={{ padding: '4px 8px' }}
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Page {reqPage + 1}</span>
+                        <button
+                            className="btn"
+                            disabled={!requests || requests.length < LIMIT}
+                            onClick={() => setReqPage(p => p + 1)}
+                            style={{ padding: '4px 8px' }}
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                     <table>
@@ -221,9 +334,9 @@ const AdminDashboard = () => {
                             ) : (
                                 Array.isArray(requests) && requests.map(req => (
                                     <tr key={req.id}>
-                                        <td style={{ color: 'var(--text-secondary)' }}>#{req.id}</td>
+                                        <td style={{ color: 'var(--text-secondary)' }}>{req.id}</td>
                                         <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{req.title}</td>
-                                        <td style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{req.submitter_username || `User #${req.submitter_id}`}</td>
+                                        <td style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{req.submitter_username || `User ${req.submitter_id}`}</td>
                                         <td style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                                             {req.handler_username || 'Unassigned'}
                                         </td>
