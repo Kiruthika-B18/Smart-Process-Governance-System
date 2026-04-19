@@ -15,7 +15,7 @@ const Navbar = () => {
 
     return (
         <nav className="bg-gray-800 text-white p-4 flex justify-between items-center">
-            <div className="font-bold text-xl">FPO Governance System</div>
+            <div className="font-bold text-xl">FPO System</div>
             <div className="flex gap-4 items-center">
                 <span className="text-gray-300 text-sm">Welcome, {user.sub} ({user.role})</span>
                 <button onClick={handleLogout} className="bg-red-500 px-3 py-1 rounded hover:bg-red-600">Logout</button>

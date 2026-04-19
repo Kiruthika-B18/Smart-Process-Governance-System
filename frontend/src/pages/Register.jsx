@@ -18,17 +18,12 @@ const Register = () => {
         e.preventDefault();
 
         if (password !== confirmPassword) {
-            toast.error("Aadhar numbers (passwords) do not match!");
+            toast.error("Passwords do not match!");
             return;
         }
 
         if (password.length < 8) {
-            toast.error("Aadhar number must be exactly 12 digits");
-            return;
-        }
-
-        if (password.length !== 12 || !/^\d+$/.test(password)) {
-            toast.error("Please enter a valid 12-digit Aadhar number");
+            toast.error("Password must be at least 8 characters long");
             return;
         }
 
@@ -81,18 +76,17 @@ const Register = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Aadhar Card Number</label>
+                        <label className="form-label">Password</label>
                         <div style={{ position: 'relative' }}>
                             <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
                             <input
                                 className="input-field"
                                 style={{ paddingLeft: '40px', paddingRight: '40px' }}
                                 type={showPassword ? 'text' : 'password'}
-                                placeholder="12-digit Aadhar"
+                                placeholder="At least 8 characters"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                maxLength={12}
                             />
                             <button
                                 type="button"
@@ -106,18 +100,17 @@ const Register = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Confirm Aadhar Card</label>
+                        <label className="form-label">Confirm Password</label>
                         <div style={{ position: 'relative' }}>
                             <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
                             <input
                                 className="input-field"
                                 style={{ paddingLeft: '40px', paddingRight: '40px' }}
                                 type={showConfirmPassword ? 'text' : 'password'}
-                                placeholder="Re-enter 12-digit Aadhar"
+                                placeholder="Re-enter your password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 required
-                                maxLength={12}
                             />
                             <button
                                 type="button"
